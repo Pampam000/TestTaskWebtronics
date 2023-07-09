@@ -1,0 +1,42 @@
+version: "3.9"
+
+volumes:
+  pg_data:
+
+services:
+  db:
+    container_name: db
+    image: postgres:15
+    env_file:
+      - .env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+  web:
+    container_name: web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./app:/src/app/
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://0.0.0.0:8000/posts"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: on-failure
